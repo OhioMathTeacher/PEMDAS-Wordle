@@ -529,12 +529,22 @@
     const DIFFICULTIES = generateDailyPuzzles();
     let currentMode = 'medium';
 
+    // Check and update last played date to allow a fresh daily attempt without resetting overall stats
+    function checkDailyReset() {
+      const todaySeed = getTodaySeed();
+      const lastPlayedDate = localStorage.getItem('pemdas_wordle_last_date');
+      
+      if (lastPlayedDate !== String(todaySeed)) {
+        localStorage.setItem('pemdas_wordle_last_date', String(todaySeed));
+      }
+    }
+
     // State Persistence with Slot-Based Out-of-Order Support
     const gameStates = {
       easy: {
         submittedGuesses: [],
-        currentInput: [], // Array representing each blank slot index
-        selectedIndex: 0, // Currently focused tile index
+        currentInput: [], 
+        selectedIndex: 0, 
         isGameOver: false,
         message: '',
         messageColor: '#dc3545'
@@ -910,6 +920,7 @@
     resetBtn.addEventListener('click', resetCurrentMode);
 
     // Initial Start
+    checkDailyReset();
     renderBoard();
     renderStatsModal();
   </script>
