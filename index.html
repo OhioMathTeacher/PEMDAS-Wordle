@@ -450,10 +450,17 @@
   </div>
 
   <script>
+    // Generates a daily seed based strictly on Midnight US Eastern Time (EST/EDT)
     function getTodaySeed() {
-      const today = new Date();
-      const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-      return parseInt(dateStr, 10);
+      const now = new Date();
+      const estDateStr = now.toLocaleDateString('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      const [month, day, year] = estDateStr.split('/');
+      return parseInt(`${year}${month}${day}`, 10);
     }
 
     function createRandom(seed) {
@@ -525,11 +532,46 @@
       };
     }
 
+    // Two-pass Wordle feedback logic ensuring exact frequency matching
+    function evaluateGuessFeedback(guess, secretDigits) {
+      const len = guess.length;
+      const feedback = new Array(len).fill('absent');
+      const targetCounts = {};
+
+      // Count total frequencies of secret digits
+      for (let i = 0; i < len; i++) {
+        const digit = secretDigits[i];
+        targetCounts[digit] = (targetCounts[digit] || 0) + 1;
+      }
+
+      // First Pass: Identify exact matches (Green)
+      for (let i = 0; i < len; i++) {
+        if (guess[i] === secretDigits[i]) {
+          feedback[i] = 'correct';
+          targetCounts[guess[i]]--;
+        }
+      }
+
+      // Second Pass: Identify remaining present digits (Yellow) or excess (Grey/Absent)
+      for (let i = 0; i < len; i++) {
+        if (feedback[i] !== 'correct') {
+          const digit = guess[i];
+          if (targetCounts[digit] && targetCounts[digit] > 0) {
+            feedback[i] = 'present';
+            targetCounts[digit]--;
+          } else {
+            feedback[i] = 'absent';
+          }
+        }
+      }
+
+      return feedback;
+    }
+
     const MAX_ATTEMPTS = 6;
     const DIFFICULTIES = generateDailyPuzzles();
     let currentMode = 'medium';
 
-    // Check and update last played date to allow a fresh daily attempt without resetting overall stats
     function checkDailyReset() {
       const todaySeed = getTodaySeed();
       const lastPlayedDate = localStorage.getItem('pemdas_wordle_last_date');
@@ -539,7 +581,6 @@
       }
     }
 
-    // State Persistence with Slot-Based Out-of-Order Support
     const gameStates = {
       easy: {
         submittedGuesses: [],
@@ -647,12 +688,10 @@
       });
     }
 
-    // Render / Restore active tab screen state
     function renderBoard() {
       const config = DIFFICULTIES[currentMode];
       const state = gameStates[currentMode];
 
-      // Ensure currentInput array matches blanks length
       if (state.currentInput.length !== config.secretDigits.length) {
         state.currentInput = new Array(config.secretDigits.length).fill('');
       }
@@ -683,20 +722,13 @@
         gridEl.appendChild(rowEl);
       }
 
-      // Restore locked-in past rows
+      // Restore locked-in past rows with correct duplicate tile feedback logic
       state.submittedGuesses.forEach((guess, rowIndex) => {
+        const feedback = evaluateGuessFeedback(guess, config.secretDigits);
         config.blankIndices.forEach((colIdx, i) => {
           const tile = document.getElementById(`tile-${rowIndex}-${colIdx}`);
-          const digit = guess[i];
-          tile.textContent = digit;
-
-          if (digit === config.secretDigits[i]) {
-            tile.classList.add('correct');
-          } else if (config.secretDigits.includes(digit)) {
-            tile.classList.add('present');
-          } else {
-            tile.classList.add('absent');
-          }
+          tile.textContent = guess[i];
+          tile.classList.add(feedback[i]);
         });
       });
 
@@ -754,10 +786,8 @@
         messageEl.textContent = '';
 
         if (state.currentInput[state.selectedIndex] !== '') {
-          // Clear selected tile
           state.currentInput[state.selectedIndex] = '';
         } else if (state.selectedIndex > 0) {
-          // Move focus backward and clear
           state.selectedIndex--;
           state.currentInput[state.selectedIndex] = '';
         }
@@ -770,10 +800,8 @@
         state.message = '';
         messageEl.textContent = '';
 
-        // Fill selected tile with digit
         state.currentInput[state.selectedIndex] = key;
 
-        // Auto-advance selection to next slot or first empty slot
         const nextEmpty = state.currentInput.findIndex((val, idx) => idx > state.selectedIndex && val === '');
         if (nextEmpty !== -1) {
           state.selectedIndex = nextEmpty;
@@ -798,7 +826,6 @@
       const state = gameStates[currentMode];
       const config = DIFFICULTIES[currentMode];
 
-      // Check if all slots are filled
       const isFilled = state.currentInput.every(digit => digit !== '');
 
       if (!isFilled) {
@@ -825,21 +852,13 @@
       state.selectedIndex = 0;
 
       const currentAttempt = state.submittedGuesses.length - 1;
+      const feedback = evaluateGuessFeedback(guess, config.secretDigits);
 
-      // Colorize current row tiles
+      // Colorize current row tiles according to frequency limits
       config.blankIndices.forEach((colIdx, i) => {
         const tile = document.getElementById(`tile-${currentAttempt}-${colIdx}`);
-        const digit = guess[i];
-
         tile.classList.remove('editable', 'selected');
-
-        if (digit === config.secretDigits[i]) {
-          tile.classList.add('correct');
-        } else if (config.secretDigits.includes(digit)) {
-          tile.classList.add('present');
-        } else {
-          tile.classList.add('absent');
-        }
+        tile.classList.add(feedback[i]);
       });
 
       attemptsDisplay.textContent = `${state.submittedGuesses.length}/${MAX_ATTEMPTS}`;
@@ -862,13 +881,11 @@
         updateStats(false, 0);
         setTimeout(() => modalOverlay.classList.add('open'), 1200);
       } else {
-        // Prepare next row
         setupActiveRowInteractivity();
         updateActiveRowDisplay();
       }
     }
 
-    // Reset current active mode tab only
     function resetCurrentMode() {
       const config = DIFFICULTIES[currentMode];
       gameStates[currentMode] = {
@@ -892,7 +909,7 @@
       modalOverlay.classList.remove('open');
     });
 
-    // Difficulty Tab Switching (Preserves each difficulty's state)
+    // Difficulty Tab Switching
     diffButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         diffButtons.forEach(b => b.classList.remove('active'));
