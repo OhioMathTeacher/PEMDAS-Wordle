@@ -368,7 +368,6 @@
       <h1>PEMDAS Wordle</h1>
       <div class="header-actions">
         <button class="icon-btn" id="stats-btn" title="Statistics">📊</button>
-        <button class="icon-btn" id="reset-btn" title="Restart Game">↺</button>
       </div>
     </div>
 
@@ -538,13 +537,11 @@
       const feedback = new Array(len).fill('absent');
       const targetCounts = {};
 
-      // Count total frequencies of secret digits
       for (let i = 0; i < len; i++) {
         const digit = secretDigits[i];
         targetCounts[digit] = (targetCounts[digit] || 0) + 1;
       }
 
-      // First Pass: Identify exact matches (Green)
       for (let i = 0; i < len; i++) {
         if (guess[i] === secretDigits[i]) {
           feedback[i] = 'correct';
@@ -552,7 +549,6 @@
         }
       }
 
-      // Second Pass: Identify remaining present digits (Yellow) or excess (Grey/Absent)
       for (let i = 0; i < len; i++) {
         if (feedback[i] !== 'correct') {
           const digit = guess[i];
@@ -612,7 +608,6 @@
     const messageEl = document.getElementById('message');
     const targetDisplay = document.getElementById('target-display');
     const attemptsDisplay = document.getElementById('attempts-display');
-    const resetBtn = document.getElementById('reset-btn');
     const statsBtn = document.getElementById('stats-btn');
     const closeModalBtn = document.getElementById('close-modal');
     const modalOverlay = document.getElementById('modal-overlay');
@@ -722,7 +717,6 @@
         gridEl.appendChild(rowEl);
       }
 
-      // Restore locked-in past rows with correct duplicate tile feedback logic
       state.submittedGuesses.forEach((guess, rowIndex) => {
         const feedback = evaluateGuessFeedback(guess, config.secretDigits);
         config.blankIndices.forEach((colIdx, i) => {
@@ -732,7 +726,6 @@
         });
       });
 
-      // Restore active row & register tile click listeners
       if (state.submittedGuesses.length < MAX_ATTEMPTS && !state.isGameOver) {
         setupActiveRowInteractivity();
         updateActiveRowDisplay();
@@ -845,7 +838,6 @@
         return;
       }
 
-      // Add locked-in row
       const guess = [...state.currentInput];
       state.submittedGuesses.push(guess);
       state.currentInput = new Array(config.secretDigits.length).fill('');
@@ -854,7 +846,6 @@
       const currentAttempt = state.submittedGuesses.length - 1;
       const feedback = evaluateGuessFeedback(guess, config.secretDigits);
 
-      // Colorize current row tiles according to frequency limits
       config.blankIndices.forEach((colIdx, i) => {
         const tile = document.getElementById(`tile-${currentAttempt}-${colIdx}`);
         tile.classList.remove('editable', 'selected');
@@ -863,7 +854,6 @@
 
       attemptsDisplay.textContent = `${state.submittedGuesses.length}/${MAX_ATTEMPTS}`;
 
-      // Win / Loss Checks
       if (guess.join('') === config.secretDigits.join('')) {
         state.message = '🎉 Splendid! You solved today\'s puzzle!';
         state.messageColor = '#28a745';
@@ -884,19 +874,6 @@
         setupActiveRowInteractivity();
         updateActiveRowDisplay();
       }
-    }
-
-    function resetCurrentMode() {
-      const config = DIFFICULTIES[currentMode];
-      gameStates[currentMode] = {
-        submittedGuesses: [],
-        currentInput: new Array(config.secretDigits.length).fill(''),
-        selectedIndex: 0,
-        isGameOver: false,
-        message: '',
-        messageColor: '#dc3545'
-      };
-      renderBoard();
     }
 
     // Modal Event Listeners
@@ -933,8 +910,6 @@
       else if (e.key === 'Enter') handleKeyPress('ENTER');
       else if (/^[0-9]$/.test(e.key)) handleKeyPress(e.key);
     });
-
-    resetBtn.addEventListener('click', resetCurrentMode);
 
     // Initial Start
     checkDailyReset();
